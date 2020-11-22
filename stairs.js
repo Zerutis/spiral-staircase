@@ -14,14 +14,6 @@
         camera.position.z = 30;
         camera.lookAt(scene.position);
 
-        // add spotlight for the shadows
-        var ambientLight = new THREE.AmbientLight(0x000000);
-		scene.add(ambientLight);
-        var spotLight = new THREE.SpotLight( 0xffffff );
-        spotLight.position.set( -40, 60, -10 );
-        spotLight.castShadow = true;
-        scene.add( spotLight );
-
         // create a render and set the size
         var renderer = new THREE.WebGLRenderer();
         renderer.setClearColor(0xEEEEEE, 1.0);
@@ -35,22 +27,43 @@
         var gui = new dat.GUI();
 
         var controls = new function() {
-            this.numberOfStairs = 5;
-            this.angle = 30;
-            this.radius = 15;
+            this.numberOfStairs = 8;
+            this.angle = 360;
+            this.radius = 0;
         }
 
-        gui.add(controls, 'numberOfStairs', 1,20).name('Laiptų skaičius').step(1);
-        gui.add(controls, 'angle', 0, 180).name('Laiptų sukimosi kampas').step(1);
-        gui.add(controls, 'radius', 0, 60).name('Spindulys').step(1);
+        // add spotlight for the shadows
+        var ambientLight = new THREE.AmbientLight(0x000000);
+        scene.add(ambientLight);
+        var spotLight = new THREE.SpotLight( 0xffffff );
+        spotLight.position.set( -40, 60, -10 );
+        spotLight.castShadow = true;
+        scene.add(spotLight);
+
+        var listeners = []
+        listeners.push(gui.add(controls, 'numberOfStairs', 1,20).name('Laiptų skaičius').step(1));
+        listeners.push(gui.add(controls, 'angle', 0, 360).name('Laiptų sukimosi kampas').step(1));
+        listeners.push(gui.add(controls, 'radius', 0, 10).name('Spindulys').step(1));
+
+        listeners.forEach(listener => listener.onFinishChange(reload));
+
+        function reload(){
+            deleteScene();
+            scene.add(createStaircase(controls.numberOfStairs, controls.angle, controls.radius, 1, 1, 1));
+        }
+
+        function deleteScene()
+        {
+            scene.remove(scene.children[scene.children.length-1]);
+        }
 
         // add the output of the renderer to the html element
         $("#WebGL-output").append(renderer.domElement);
-        var controls = new THREE.TrackballControls( camera, renderer.domElement );     
+        var control = new THREE.TrackballControls( camera, renderer.domElement );     
         render();
 
         //create the ground plane
-        function createGround(length, width){
+        function createGround(length, width, x, y, z){
             var planeGeometry = new THREE.PlaneGeometry(length,width);
             var planeMaterial = new THREE.MeshLambertMaterial({color: 0xabcdef});
             var floor = new THREE.Mesh(planeGeometry,planeMaterial);
@@ -58,11 +71,13 @@
 
             // rotate and position the plane
             floor.rotation.x=-0.5*Math.PI;
-            floor.position.x=15
+            floor.position.x=x
+            floor.position.y=y;
+            floor.position.z=z;
 
-            scene.add(floor);
+            return floor;
         }
-        createGround(80,40);
+        scene.add(createGround(80,40,20,0,0));
 
         function generatePoints(points, segments, radius, radiusSegments, closed) {
             spGroup = new THREE.Object3D();
@@ -103,7 +118,7 @@
         }
 
         var options = {
-            amount: 7,
+            amount: 8,
             bevelThickness: 0,
             bevelSize: 0.5,
             bevelSegments: 6,
@@ -111,7 +126,6 @@
             curveSegments: 8,
             steps: 5
         };
-
 
         // creates support construction that contains handling, and cylinder that hold stairs from bottom and step.
         function createStaircase(numberOfStairs, degree, radius, x0, y0 ,z0) {
@@ -130,8 +144,6 @@
 
             var handrail = [];
             for (var i = 0; i < numberOfStairs; i++){
-
-
                 // First point of rod
                 var points = [];
                 var axisX = x0 + plusX * i;
@@ -139,19 +151,20 @@
                 var axisZ = z0 + radius;
 
                 // for small cylinder and step position
-                var vector = new THREE.Vector3(axisX, axisY, axisZ).applyAxisAngle(axis, angle * i * Math.PI / 180)
-
+                var vector = new THREE.Vector3(axisX, axisY-0.3, axisZ-2).applyAxisAngle(axis, angle * i * Math.PI / 180)
+                var vector1 = new THREE.Vector3(axisX, axisY, axisZ).applyAxisAngle(axis, angle * i * Math.PI / 180)
                 // creates small cylinder for holding step.
                 const geometry = new THREE.CylinderGeometry( 1, 1, 2, 64 );
                 const material = new THREE.MeshPhongMaterial ( {color: cylinderColor} );
                 const base = new THREE.Mesh( geometry, material );
-                base.position.set(vector.x,vector.y,vector.z);
+                base.position.set(vector1.x,vector1.y,vector1.z);
                 groupSupport.add(base);
 
                 // creates step
                 step = createMesh(new THREE.ExtrudeGeometry(drawShape(), options),0x654321);
-                step.position.set(vector.x,vector.y,vector.z);
+                step.position.set(vector.x, vector.y, vector.z);
                 step.rotation.y = (angle * i * Math.PI / 180);
+                step.castShadow = true;
                 groupSupport.add(step);
 
                 // second point of rod
@@ -173,34 +186,21 @@
                 var cylinderMesh = generatePoints(points,64,0.2,8,false);
                 groupSupport.add(cylinderMesh);
             }
-            var handleMesh = generatePoints(handrail,64,0.3,8,false);
+            var handleMesh = generatePoints(handrail,64,0.4,12,false);
 
             groupSupport.add(handleMesh);
-            groupSupport.castShadow = true;
+            groupSupport.receiveShadow = true;
             return groupSupport;
         }
-        
-        //scene.add(createStaircase(10, 180, 0, 1, 1, 1));
+    
+        scene.add(createStaircase(controls.numberOfStairs, controls.angle, controls.radius, 1, 1, 1));
 
         function render() {
-            var group = new THREE.Object3D();
-
-            var numberOfStairs = controls.numberOfStairs;
-            var angle = controls.angle;
-            var radius = controls.radius;
-
-            //console.log(numberOfStairs);
-
-            //group.add(createStaircase(numberOfStairs, angle, radius, 1, 1, 1));
-           
-
             stats.update();
  
             renderer.render( scene, camera );
             requestAnimationFrame( render );
-            controls.update(); 
-
-            
+            control.update(); 
         }
 
         function initStats() {
