@@ -27,8 +27,8 @@
         var gui = new dat.GUI();
 
         var controls = new function() {
-            this.numberOfStairs = 8;
-            this.angle = 360;
+            this.numberOfStairs = 4;
+            this.angle = 90;
             this.radius = 0;
         }
 
@@ -42,7 +42,7 @@
 
         var listeners = []
         listeners.push(gui.add(controls, 'numberOfStairs', 1,20).name('Laiptų skaičius').step(1));
-        listeners.push(gui.add(controls, 'angle', -360, 360).name('Laiptų sukimosi kampas').step(1));
+        listeners.push(gui.add(controls, 'angle', 0, 360).name('Laiptų posūkis').step(1));
         listeners.push(gui.add(controls, 'radius', 0, 10).name('Spindulys').step(1));
 
         listeners.forEach(listener => listener.onFinishChange(reload));
@@ -80,10 +80,6 @@
         scene.add(createGround(80,40,0,0,0));
 
         function generatePoints(points, segments, radius, radiusSegments, closed) {
-            spGroup = new THREE.Object3D();
-            var material = new THREE.MeshLambertMaterial({color: 0xff0000, transparent: false});
-
-            // use the same points to create a convexgeometry
             var tubeGeometry = new THREE.TubeGeometry(new THREE.SplineCurve3(points), segments, radius, radiusSegments, closed);
             tubeMesh = createMesh(tubeGeometry, 0xff0000);
             return tubeMesh;
@@ -97,25 +93,39 @@
             return mesh;
         }
 
-        function drawShape(y0,y1) {
-            var shape = new THREE.Shape();
-            shape.moveTo(-1, y0)
-            shape.lineTo(-1, y1)
-            shape.lineTo(1.5, y1)
-            shape.lineTo(1.5, y0)
-            shape.lineTo(-1, y0)
-            return shape;
+        var stepProps = new function(){
+			this.steps = 1,
+			this.amount = 1,
+            this.bevelEnabled = true,
+			this.bevelThickness = 0.1,
+			this.bevelSize = 0.1,
+			this.bevelSegments = 10,
+            this.corner = 0.1;
+            
         }
 
-        var options = {
-            amount: 8,
-            bevelThickness: 0,
-            bevelSize: 0.5,
-            bevelSegments: 6,
-            bevelEnabled: true,
-            curveSegments: 8,
-            steps: 5
+        var extrudeSettings = {
+                steps: stepProps.steps,
+                amount: stepProps.amount,
+                bevelEnabled: stepProps.bevelEnabled,
+                bevelThickness: stepProps.bevelThickness,
+                bevelSize: stepProps.bevelSize,
+                bevelSegments: stepProps.bevelSegments
         };
+
+        function drawShape(x,y) {
+			var step = new THREE.Shape();
+			step.moveTo(-x/2,-y/2+stepProps.corner);
+			step.bezierCurveTo(-x/2,-y/2,-x/2,-y/2,-x/2+stepProps.corner,-y/2);
+			step.lineTo(x/2-stepProps.corner,-y/2);
+			step.bezierCurveTo(x/2,-y/2,x/2,-y/2,x/2,stepProps.corner-y/2);
+			step.lineTo(x/2,y/2-stepProps.corner);
+			step.bezierCurveTo(x/2,y/2,x/2,y/2,x/2-stepProps.corner,y/2);
+			step.bezierCurveTo(0,y/2,-x/2+stepProps.corner,stepProps.corner,-x/2+stepProps.corner,0);
+			step.bezierCurveTo(-x/2,-stepProps.corner,-x/2,-stepProps.corner,-x/2,-stepProps.corner*2);
+			step.lineTo(-x/2,-y/2+1);
+            return step;
+        } 
 
         // creates support construction that contains handling, and cylinder that hold stairs from bottom and step.
         function createStaircase(numberOfStairs, degree, radius, x0, y0 ,z0) {
@@ -132,6 +142,8 @@
             const plusY = 2;
             const plusZ = 7; 
 
+            
+
             var handrail = [];
             for (var i = 0; i < numberOfStairs; i++){
                 // First point of rod
@@ -141,21 +153,15 @@
                 var axisZ = z0 + radius;
 
                 // for small cylinder and step position
-                var vector = new THREE.Vector3(axisX, axisY-0.3, axisZ-2).applyAxisAngle(axis, angle * i * Math.PI / 180)
-                var vector1 = new THREE.Vector3(axisX, axisY, axisZ).applyAxisAngle(axis, angle * i * Math.PI / 180)
+                var vector = new THREE.Vector3(axisX, axisY, axisZ).applyAxisAngle(axis, angle * i * Math.PI / 180)
                 // creates small cylinder for holding step.
                 const geometry = new THREE.CylinderGeometry( 1, 1, 2, 64 );
                 const material = new THREE.MeshPhongMaterial ( {color: cylinderColor} );
                 const base = new THREE.Mesh( geometry, material );
-                base.position.set(vector1.x,vector1.y,vector1.z);
+                base.position.set(vector.x,vector.y,vector.z);
                 base.castShadow = true;
                 groupSupport.add(base);
 
-                // creates step
-                step = createMesh(new THREE.ExtrudeGeometry(drawShape(1,2), options),0x654321);
-                step.position.set(vector.x, vector.y, vector.z);
-                step.rotation.y = (angle * i * Math.PI / 180);
-                groupSupport.add(step);
 
                 // second point of rod
                 points.push(new THREE.Vector3(axisX, axisY, axisZ).applyAxisAngle(axis, angle * i * Math.PI / 180));
@@ -163,6 +169,30 @@
                 axisY = y0 + plusY * i + 0.5;
                 axisZ = z0 + plusZ + radius;
                 points.push(new THREE.Vector3(axisX, axisY, axisZ).applyAxisAngle(axis, angle * i * Math.PI / 180));
+
+                // creates step
+                var step;
+                if(i%2 == 0){
+                    vector = new THREE.Vector3(axisX-1, axisY+1.2, axisZ-4).applyAxisAngle(axis, angle * i * Math.PI / 180)
+                    const shapeGeometry = new THREE.ExtrudeGeometry(drawShape(8,4.5), extrudeSettings);
+                    const stepMesh = new THREE.MeshLambertMaterial({color: 0x654321});
+                    step = new THREE.Mesh(shapeGeometry,stepMesh);
+                    step.position.set(vector.x, vector.y, vector.z);
+                    step.rotateX(90 * Math.PI / 180);
+                    step.rotateZ((90 - (angle * i)) * Math.PI / 180);
+                }
+                else{
+                    vector = new THREE.Vector3(axisX-1, axisY+1.2, axisZ-4).applyAxisAngle(axis, angle * i * Math.PI / 180)
+                    const shapeGeometry = new THREE.ExtrudeGeometry(drawShape(8,4.5), extrudeSettings);
+                    const stepMesh = new THREE.MeshLambertMaterial({color: 0x654321});
+                    step = new THREE.Mesh(shapeGeometry,stepMesh);
+                    step.position.set(vector.x, vector.y-1, vector.z);
+                    step.rotateX(-90 * Math.PI / 180);
+                    step.rotateZ((90 + (angle * i)) * Math.PI / 180);
+                }
+                step.castShadow = true;
+                step.receiveShadow = true;
+                groupSupport.add(step);
 
                 // third point of rod
                 axisX = x0 + plusX * i;
