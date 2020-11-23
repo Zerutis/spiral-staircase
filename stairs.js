@@ -42,7 +42,7 @@
 
         var listeners = []
         listeners.push(gui.add(controls, 'numberOfStairs', 1,20).name('Laiptų skaičius').step(1));
-        listeners.push(gui.add(controls, 'angle', 0, 360).name('Laiptų sukimosi kampas').step(1));
+        listeners.push(gui.add(controls, 'angle', -360, 360).name('Laiptų sukimosi kampas').step(1));
         listeners.push(gui.add(controls, 'radius', 0, 10).name('Spindulys').step(1));
 
         listeners.forEach(listener => listener.onFinishChange(reload));
@@ -65,7 +65,7 @@
         //create the ground plane
         function createGround(length, width, x, y, z){
             var planeGeometry = new THREE.PlaneGeometry(length,width);
-            var planeMaterial = new THREE.MeshLambertMaterial({color: 0xabcdef});
+            var planeMaterial = new THREE.MeshPhongMaterial({color: 0xabcdef});
             var floor = new THREE.Mesh(planeGeometry,planeMaterial);
             floor.receiveShadow = true;
 
@@ -77,20 +77,11 @@
 
             return floor;
         }
-        scene.add(createGround(80,40,20,0,0));
+        scene.add(createGround(80,40,0,0,0));
 
         function generatePoints(points, segments, radius, radiusSegments, closed) {
             spGroup = new THREE.Object3D();
-            var material = new THREE.MeshPhongMaterial({color: 0xff0000, transparent: false});
-            points.forEach(function (point) {
-
-                var spGeom = new THREE.SphereGeometry(0.2);
-                var spMesh = new THREE.Mesh(spGeom, material);
-                spMesh.position = point;
-                spGroup.add(spMesh);
-            });
-            // add the points as a group to the scene
-            scene.add(spGroup);
+            var material = new THREE.MeshLambertMaterial({color: 0xff0000, transparent: false});
 
             // use the same points to create a convexgeometry
             var tubeGeometry = new THREE.TubeGeometry(new THREE.SplineCurve3(points), segments, radius, radiusSegments, closed);
@@ -100,20 +91,19 @@
 
         function createMesh(geom, color) {
             var meshMaterial = new THREE.MeshLambertMaterial({color: color});
-            // create a multimaterial
-            var mesh = THREE.SceneUtils.createMultiMaterialObject(geom, [meshMaterial]);
-
+            var mesh = new THREE.Mesh(geom,meshMaterial);
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
             return mesh;
         }
 
-        function drawShape() {
-            // create a basic shape
+        function drawShape(y0,y1) {
             var shape = new THREE.Shape();
-            shape.moveTo(-1, 1)
-            shape.lineTo(-1, 2)
-            shape.lineTo(1.5, 2)
-            shape.lineTo(1.5, 1.0)
-            shape.lineTo(-1, 1.0)
+            shape.moveTo(-1, y0)
+            shape.lineTo(-1, y1)
+            shape.lineTo(1.5, y1)
+            shape.lineTo(1.5, y0)
+            shape.lineTo(-1, y0)
             return shape;
         }
 
@@ -158,13 +148,13 @@
                 const material = new THREE.MeshPhongMaterial ( {color: cylinderColor} );
                 const base = new THREE.Mesh( geometry, material );
                 base.position.set(vector1.x,vector1.y,vector1.z);
+                base.castShadow = true;
                 groupSupport.add(base);
 
                 // creates step
-                step = createMesh(new THREE.ExtrudeGeometry(drawShape(), options),0x654321);
+                step = createMesh(new THREE.ExtrudeGeometry(drawShape(1,2), options),0x654321);
                 step.position.set(vector.x, vector.y, vector.z);
                 step.rotation.y = (angle * i * Math.PI / 180);
-                step.castShadow = true;
                 groupSupport.add(step);
 
                 // second point of rod
@@ -184,12 +174,12 @@
                 handrail.push(new THREE.Vector3(axisX, axisY, axisZ).applyAxisAngle(axis, angle * i * Math.PI / 180));
 
                 var cylinderMesh = generatePoints(points,64,0.2,8,false);
+                cylinderMesh.castShadow = true;
                 groupSupport.add(cylinderMesh);
             }
             var handleMesh = generatePoints(handrail,64,0.4,12,false);
 
             groupSupport.add(handleMesh);
-            groupSupport.receiveShadow = true;
             return groupSupport;
         }
     
